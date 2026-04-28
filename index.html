@@ -295,7 +295,7 @@ out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
 
-let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Charge/JSON`);
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`);
 let j=await r.json();
 let p=j?.PropertyTable?.Properties?.[0];
 
@@ -304,9 +304,9 @@ return /^[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)*$/.test(str);
 }
 
 const displayName =
-isFormula(term)
-? (p.IUPACName || "Composto chimico")
-: term;
+p.Title ||
+(p.IUPACName && p.IUPACName.length < 40 ? p.IUPACName : null) ||
+term;
 
 lastName = displayName;
 lastFormula = p.MolecularFormula;
