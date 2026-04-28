@@ -69,6 +69,10 @@ color:#06210f;
 box-shadow:0 0 18px rgba(32,227,122,.35);
 }
 
+.aiBtn:hover{
+background:#18c767;
+}
+
 .container{
 max-width:1000px;
 margin:2rem auto;
@@ -106,13 +110,7 @@ border-radius:12px;
 .label{font-size:.7rem;color:#6aa6c9;}
 .value{font-weight:800;margin-top:.3rem;word-break:break-word;}
 
-img{
-display:block;
-margin:2rem auto;
-background:white;
-padding:10px;
-border-radius:12px;
-}
+img{display:block;margin:2rem auto;background:white;padding:10px;border-radius:12px;}
 
 .ai{
 margin-top:2rem;
@@ -122,48 +120,21 @@ background:linear-gradient(135deg,rgba(0,212,255,.1),rgba(176,38,255,.08));
 border:1px solid #1f3b57;
 }
 
-.loading{
-text-align:center;
-margin-top:2rem;
-color:#00D4FF;
-font-weight:800;
-}
+.loading{text-align:center;margin-top:2rem;color:#00D4FF;font-weight:800;}
+.error{color:#ff5c5c;text-align:center;margin-top:1rem;}
 
-.error{
-color:#ff5c5c;
-text-align:center;
-margin-top:1rem;
-}
-
-/* loader */
-.molecule-loader{
-width:60px;height:60px;margin:0 auto 10px auto;position:relative;
-}
-.atom{
-position:absolute;width:10px;height:10px;border-radius:50%;
-background:#00D4FF;top:50%;left:50%;
-transform-origin:0 0;
-animation:orbit 1.2s linear infinite;
-}
-.atom:nth-child(2){animation-delay:.4s;}
-.atom:nth-child(3){animation-delay:.8s;}
-
-@keyframes orbit{
-0%{transform:rotate(0deg) translateX(20px) rotate(0deg);}
-100%{transform:rotate(360deg) translateX(20px) rotate(-360deg);}
-}
 </style>
 </head>
 
 <body>
 
 <header>
-<h1>ChemLab 2C</h1>
+<h1>ChemLab</h1>
 <p>di Pizzamiglio, Mabrouk, Gorodenco, Ramera, Parigi.</p>
 </header>
 
 <div class="search">
-<input id="q" placeholder="H2SO4, Fe2O3, NH4+, glucosio..." onkeydown="if(event.key==='Enter')search()">
+<input id="q" placeholder="H2SO4, glucose, aspirin..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">SCAN</button>
 </div>
 
@@ -178,228 +149,115 @@ function sub(s){
 return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
 }
 
-/* INPUT BASE */
-const map={
-glucosio:"glucose",
-acqua:"water",
-ferro:"iron",
-oro:"gold",
-rame:"copper",
-argento:"silver",
-etanolo:"ethanol",
-metano:"methane",
-aspirina:"aspirin"
-};
+const map={glucosio:"glucose",acqua:"water",ferro:"iron",oro:"gold",rame:"copper",argento:"silver",etanolo:"ethanol",metano:"methane",aspirina:"aspirin"};
 
-/* DIZIONARIO ITALIANO */
-const dictIT = {
-"water":"acqua",
-"glucose":"glucosio",
-"iron":"ferro",
-
-"iron(iii) oxide":"ossido di ferro(III)",
-"iron(3+) oxide":"ossido di ferro(III)",
-"diiron trioxide":"ossido di ferro(III)",
-
-"ammonium":"ione ammonio",
-
-"sulfuric acid":"acido solforico",
-"nitric acid":"acido nitrico",
-"hydrochloric acid":"acido cloridrico",
-
-"methane":"metano",
-"ethanol":"etanolo"
-};
-
-/* RICONOSCE FORMULA */
-function isFormula(q){
-
-/* Deve contenere almeno una cifra o simbolo chimico */
-return /[0-9()+\-]/.test(q);
-
+async function cid(name){
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
+if(!r.ok)return null;
+let j=await r.json();
+return j?.IdentifierList?.CID?.[0]||null;
 }
 
-/* CID */
-async function cid(name){
-
-let type = isFormula(name) ? "formula" : "name";
+async function ai(name, formula){
 
 try{
 
-let r = await fetch(
-`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${type}/${encodeURIComponent(name)}/cids/JSON`
+const r = await fetch(
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyA-NASvms7DgP27Y4cjbCv7CW8cyS_zZoQ",
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body: JSON.stringify({
+contents: [{parts: [{text:`Sei un assistente di chimica. Rispondi SOLO in italiano e SOLO nel formato:
+
+🧪 Nome: ${name}
+🧬 Formula: ${formula}
+
+📌 Classificazione:
+- punto 1
+- punto 2
+- punto 3
+
+⚗️ Proprietà fondamentali:
+- punto 1
+- punto 2
+- punto 3
+- punto 4
+
+⚡ Funzione principale:
+- punto 1
+- punto 2
+
+🧠 Riassunto:
+- una frase semplice`}] }]
+})
+}
 );
 
-if(!r.ok) return null;
+const data = await r.json();
 
-let j = await r.json();
+if(data?.error){return "AI error: " + data.error.message;}
 
-return j?.IdentifierList?.CID?.[0] || null;
+return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
 
-}catch(e){
-
-return null;
+}catch(e){return "AI request failed";}
 
 }
 
-}
-
-/* NOME INTELLIGENTE */
-function getChemName(p, term){
-
-const title = p.Title;
-const iupac = p.IUPACName;
-
-/* se sembra formula → scarta */
-function looksFormula(n){
-return /^[A-Z0-9()+\-]+$/.test(n);
-}
-
-/* se troppo tecnico */
-function looksIUPAC(n){
-return n.includes("(")
-|| n.includes(",")
-|| n.length > 40;
-}
-
-let base;
-
-/* PRIORITÀ:
-1 → Title (nome comune)
-2 → IUPAC se Title brutto
-3 → term originale
-*/
-
-if(title && !looksFormula(title) && !looksIUPAC(title)){
-
-base = title;
-
-}
-else if(iupac && !looksIUPAC(iupac)){
-
-base = iupac;
-
-}
-else{
-
-base = term;
-
-}
-
-/* TRADUZIONE IT */
-let it =
-dictIT[base?.toLowerCase()]
-|| null;
-
-return {main: base, it};
-
-}
-
-/* SEARCH */
 async function search(){
 
 let q=document.getElementById("q").value.trim();
 let out=document.getElementById("out");
 
-if(!q){
-out.innerHTML="<div class='error'>Inserisci un composto</div>";
-return;
-}
+if(!q){out.innerHTML="<div class='error'>Inserisci un composto</div>";return;}
 
-/* LOADING */
-out.innerHTML=`
-<div class="loading">
-<div class="molecule-loader">
-<div class="atom"></div>
-<div class="atom"></div>
-<div class="atom"></div>
-</div>
-Analisi molecolare...
-</div>
-`;
+out.innerHTML="<div class='loading'>Analisi molecolare...</div>";
 
 let term=map[q.toLowerCase()]||q;
-
-/* CID */
 let id=await cid(term);
 
-if(!id){
-out.innerHTML="<div class='error'>Non trovato</div>";
-return;
-}
+if(!id){out.innerHTML="<div class='error'>Non trovato</div>";return;}
 
-/* PROPRIETÀ */
-let r=await fetch(
-`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`
-);
-
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,InChIKey,Charge/JSON`);
 let j=await r.json();
-
 let p=j?.PropertyTable?.Properties?.[0];
 
-if(!p){
-out.innerHTML="<div class='error'>Errore dati</div>";
-return;
-}
-
-/* NOME */
-const nameObj =
-getChemName(p, term);
-
-lastName = nameObj.main;
+lastName = p.IUPACName || term;
 lastFormula = p.MolecularFormula;
 
-let secondary = nameObj.it;
+let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
-let img=
-`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
-
-/* OUTPUT */
 out.innerHTML=`
 <div class='card'>
-
-<div class='big'>
-${sub(p.MolecularFormula)}
+<div class='big'>${sub(p.MolecularFormula)}</div>
+<div>${p.IUPACName}</div>
 </div>
-
-<div>
-<b>${nameObj.main}</b>
-</div>
-
-${secondary ?
-`<div style="opacity:.75;font-size:.95rem">
-🇮🇹 ${secondary}
-</div>` : ""}
 
 <img src='${img}' width='260'>
 
 <div class='grid'>
-
-<div class='box'>
-<div class='label'>Massa</div>
-<div class='value'>${p.MolecularWeight}</div>
+<div class='box'><div class='label'>Massa</div><div class='value'>${p.MolecularWeight}</div></div>
+<div class='box'><div class='label'>Carica</div><div class='value'>${p.Charge}</div></div>
+<div class='box'><div class='label'>InChIKey</div><div class='value'>${p.InChIKey}</div></div>
+<div class='box'><div class='label'>PubChem</div><div class='value'><a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}" target="_blank" style="color:#00D4FF;text-decoration:none;">Apri scheda</a></div></div>
 </div>
 
-<div class='box'>
-<div class='label'>Carica</div>
-<div class='value'>${p.Charge}</div>
-</div>
+<button class='aiBtn' onclick='askAI()'>Chiedi ad AI ✨</button>
 
-<div class='box'>
-<div class='label'>PubChem</div>
-<div class='value'>
-<a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}"
-target="_blank"
-style="color:#00D4FF;text-decoration:none;">
-Apri scheda
-</a>
-</div>
-</div>
-
-</div>
-
-</div>
+<div id='aiOut' class='ai'></div>
 `;
+
+}
+
+async function askAI(){
+
+let out=document.getElementById("aiOut");
+
+out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
+
+let res = await ai(lastName,lastFormula);
+
+out.innerHTML = `<b>ChemGPT AI</b><p>${res}</p>`;
 
 }
 
