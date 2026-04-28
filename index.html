@@ -193,21 +193,10 @@ aspirina:"aspirin"
 
 /* CID */
 async function cid(name){
-
-// rileva se è formula
-let isFormula = /^[A-Za-z0-9()+\-]+$/.test(name);
-
-let type = isFormula ? "formula" : "name";
-
-let r = await fetch(
-`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${type}/${encodeURIComponent(name)}/cids/JSON`
-);
-
-if(!r.ok) return null;
-
-let j = await r.json();
-
-return j?.IdentifierList?.CID?.[0] || null;
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
+if(!r.ok)return null;
+let j=await r.json();
+return j?.IdentifierList?.CID?.[0]||null;
 }
 
 /* AI */
@@ -264,7 +253,7 @@ const title = p.Title;
 const iupac = p.IUPACName;
 
 function bad(n){
-return !n || n.length > 60;
+return !n || n.length > 60 || n.includes("(");
 }
 
 const dictIT = {
@@ -304,6 +293,11 @@ return;
 out.innerHTML=`
 <div class="loading">
 <div class="molecule-loader">
+<div class="atom"></div>
+<div class="atom"></div>
+<div class="atom"></div>
+</div>
+Analisi molecolare...
 <script>
 
 let lastName = "";
@@ -313,7 +307,7 @@ function sub(s){
 return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
 }
 
-/* INPUT BASE */
+/* input base */
 const map={
 glucosio:"glucose",
 acqua:"water",
@@ -331,13 +325,17 @@ const dictIT = {
 "water":"acqua",
 "glucose":"glucosio",
 "iron":"ferro",
+
 "iron(iii) oxide":"ossido di ferro(III)",
 "iron(3+) oxide":"ossido di ferro(III)",
 "diiron trioxide":"ossido di ferro(III)",
+
 "ammonium":"ione ammonio",
+
 "sulfuric acid":"acido solforico",
 "nitric acid":"acido nitrico",
 "hydrochloric acid":"acido cloridrico",
+
 "methane":"metano",
 "ethanol":"etanolo"
 };
@@ -347,10 +345,12 @@ function isFormula(q){
 return /^[A-Za-z0-9()+\-]+$/.test(q);
 }
 
-/* CID */
+/* CID (fix principale) */
 async function cid(name){
 
 let type = isFormula(name) ? "formula" : "name";
+
+try{
 
 let r = await fetch(
 `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${type}/${encodeURIComponent(name)}/cids/JSON`
@@ -361,79 +361,59 @@ if(!r.ok) return null;
 let j = await r.json();
 
 return j?.IdentifierList?.CID?.[0] || null;
+
+}catch(e){
+
+return null;
+
 }
 
-/* PRENDE SYNONYMS */
-async function getSynonyms(id){
-
-let r = await fetch(
-`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/synonyms/JSON`
-);
-
-if(!r.ok) return [];
-
-let j = await r.json();
-
-return j?.InformationList?.Information?.[0]?.Synonym || [];
 }
 
-/* CONTROLLA NOMI SCARSI */
-function bad(n){
-return !n || n.length > 60;
-}
-
-/* SCEGLIE NOME MIGLIORE */
+/* NOME INTELLIGENTE */
 function getChemName(p, term){
 
 const title = p.Title;
 const iupac = p.IUPACName;
 
+/* FIX bad() */
 function bad(n){
 return !n || n.length > 60;
 }
 
-/* dizionario italiano migliorato */
-const dictIT = {
-"water":"acqua",
-"glucose":"glucosio",
-"iron":"ferro",
-
-"iron(iii) oxide":"ossido di ferro(III)",
-"iron(3+) oxide":"ossido di ferro(III)",
-"diiron trioxide":"ossido di ferro(III)",
-
-"ammonium":"ione ammonio",
-
-"sulfuric acid":"acido solforico",
-"nitric acid":"acido nitrico",
-"hydrochloric acid":"acido cloridrico",
-
-"methane":"metano",
-"ethanol":"etanolo"
-};
-
-/* preferisce IUPAC se il title è formula */
 let base;
 
-if(/^[A-Za-z0-9()+\-]+$/.test(title)){
-base = !bad(iupac) ? iupac : term;
+/* Se title è formula → usa IUPAC */
+if(isFormula(title)){
+
+base = !bad(iupac)
+? iupac
+: term;
+
 }
 else{
-base = !bad(title) ? title :
+
+base =
+!bad(title) ? title :
 !bad(iupac) ? iupac :
 term;
+
 }
 
-let it = dictIT[base.toLowerCase()] || null;
+/* traduzione IT */
+let it =
+dictIT[base?.toLowerCase()]
+|| null;
 
 return {main: base, it};
+
 }
 
 /* AI */
 async function ai(name, formula){
 
 const r = await fetch(
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_KEY",
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_API_KEY",
 {
 method:"POST",
 headers:{"Content-Type":"application/json"},
@@ -476,6 +456,7 @@ if(data?.error)
 return "AI error: " + data.error.message;
 
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
+
 }
 
 /* SEARCH */
@@ -502,6 +483,7 @@ Analisi molecolare...
 
 let term=map[q.toLowerCase()]||q;
 
+/* CID */
 let id=await cid(term);
 
 if(!id){
@@ -509,7 +491,7 @@ out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
 
-/* proprietà base */
+/* proprietà */
 let r=await fetch(
 `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`
 );
@@ -518,17 +500,24 @@ let j=await r.json();
 
 let p=j?.PropertyTable?.Properties?.[0];
 
-/* nome intelligente */
+if(!p){
+out.innerHTML="<div class='error'>Errore dati</div>";
+return;
+}
+
+/* nome */
 const nameObj =
-await getChemName(p, term, id);
+getChemName(p, term);
 
 lastName = nameObj.main;
 lastFormula = p.MolecularFormula;
 
 let secondary = nameObj.it;
 
-let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
+let img=
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
+/* OUTPUT */
 out.innerHTML=`
 <div class='card'>
 
@@ -581,6 +570,7 @@ Chiedi ad AI ✨
 
 </div>
 `;
+
 }
 
 /* AI BUTTON */
@@ -596,6 +586,7 @@ await ai(lastName,lastFormula);
 
 out.innerHTML =
 `<b>ChemLab AI</b><p>${res}</p>`;
+
 }
 
 </script>
