@@ -178,136 +178,7 @@ function sub(s){
 return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
 }
 
-/* input base */
-const map={
-glucosio:"glucose",
-acqua:"water",
-ferro:"iron",
-oro:"gold",
-rame:"copper",
-argento:"silver",
-etanolo:"ethanol",
-metano:"methane",
-aspirina:"aspirin"
-};
-
-/* CID */
-async function cid(name){
-let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
-if(!r.ok)return null;
-let j=await r.json();
-return j?.IdentifierList?.CID?.[0]||null;
-}
-
-/* AI */
-async function ai(name, formula){
-
-const r = await fetch(
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCTfq1Z1bw10I2xjJdebzkohTh_07leJQs",
-{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body: JSON.stringify({
-contents:[{
-parts:[{
-text:`Sei un assistente di chimica.
-
-Rispondi SOLO in italiano e SOLO nel formato:
-
-🧪 Nome: ${name}
-🧬 Formula: ${formula}
-
-📌 Classificazione:
-- punto 1
-- punto 2
-- punto 3
-
-⚗️ Proprietà fondamentali:
-- punto 1
-- punto 2
-- punto 3
-- punto 4
-
-⚡ Funzione principale:
-- punto 1
-- punto 2
-
-🧠 Riassunto:
-- una frase semplice`
-}]
-}]
-})
-}
-);
-
-const data = await r.json();
-if(data?.error) return "AI error: " + data.error.message;
-
-return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
-}
-
-/* NOME INTELLIGENTE */
-function getChemName(p, term){
-
-const title = p.Title;
-const iupac = p.IUPACName;
-
-function bad(n){
-return !n || n.length > 60 || n.includes("(");
-}
-
-const dictIT = {
-"water":"acqua",
-"glucose":"glucosio",
-"iron":"ferro",
-"iron(iii) oxide":"ossido di ferro(III)",
-"ammonium":"ione ammonio",
-"sulfuric acid":"acido solforico",
-"nitric acid":"acido nitrico",
-"hydrochloric acid":"acido cloridrico",
-"methane":"metano",
-"ethanol":"etanolo"
-};
-
-let base =
-!bad(title) ? title :
-!bad(iupac) ? iupac :
-term;
-
-let it = dictIT[base.toLowerCase()] || null;
-
-return {main: base, it};
-}
-
-/* SEARCH */
-async function search(){
-
-let q=document.getElementById("q").value.trim();
-let out=document.getElementById("out");
-
-if(!q){
-out.innerHTML="<div class='error'>Inserisci un composto</div>";
-return;
-}
-
-out.innerHTML=`
-<div class="loading">
-<div class="molecule-loader">
-<div class="atom"></div>
-<div class="atom"></div>
-<div class="atom"></div>
-</div>
-Analisi molecolare...
-<script>
-
-let lastName = "";
-let lastFormula = "";
-
-function sub(s){
-return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
-}
-
-/* input base */
+/* INPUT BASE */
 const map={
 glucosio:"glucose",
 acqua:"water",
@@ -342,10 +213,13 @@ const dictIT = {
 
 /* RICONOSCE FORMULA */
 function isFormula(q){
-return /^[A-Za-z0-9()+\-]+$/.test(q);
+
+/* Deve contenere almeno una cifra o simbolo chimico */
+return /[0-9()+\-]/.test(q);
+
 }
 
-/* CID (fix principale) */
+/* CID */
 async function cid(name){
 
 let type = isFormula(name) ? "formula" : "name";
@@ -376,86 +250,48 @@ function getChemName(p, term){
 const title = p.Title;
 const iupac = p.IUPACName;
 
-/* FIX bad() */
-function bad(n){
-return !n || n.length > 60;
+/* se sembra formula → scarta */
+function looksFormula(n){
+return /^[A-Z0-9()+\-]+$/.test(n);
+}
+
+/* se troppo tecnico */
+function looksIUPAC(n){
+return n.includes("(")
+|| n.includes(",")
+|| n.length > 40;
 }
 
 let base;
 
-/* Se title è formula → usa IUPAC */
-if(isFormula(title)){
+/* PRIORITÀ:
+1 → Title (nome comune)
+2 → IUPAC se Title brutto
+3 → term originale
+*/
 
-base = !bad(iupac)
-? iupac
-: term;
+if(title && !looksFormula(title) && !looksIUPAC(title)){
+
+base = title;
+
+}
+else if(iupac && !looksIUPAC(iupac)){
+
+base = iupac;
 
 }
 else{
 
-base =
-!bad(title) ? title :
-!bad(iupac) ? iupac :
-term;
+base = term;
 
 }
 
-/* traduzione IT */
+/* TRADUZIONE IT */
 let it =
 dictIT[base?.toLowerCase()]
 || null;
 
 return {main: base, it};
-
-}
-
-/* AI */
-async function ai(name, formula){
-
-const r = await fetch(
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_API_KEY",
-{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body: JSON.stringify({
-contents:[{
-parts:[{
-text:`Sei un assistente di chimica.
-
-Rispondi SOLO in italiano e SOLO nel formato:
-
-🧪 Nome: ${name}
-🧬 Formula: ${formula}
-
-📌 Classificazione:
-- punto 1
-- punto 2
-- punto 3
-
-⚗️ Proprietà fondamentali:
-- punto 1
-- punto 2
-- punto 3
-- punto 4
-
-⚡ Funzione principale:
-- punto 1
-- punto 2
-
-🧠 Riassunto:
-- una frase semplice`
-}]
-}]
-})
-}
-);
-
-const data = await r.json();
-
-if(data?.error)
-return "AI error: " + data.error.message;
-
-return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
 
 }
 
@@ -470,6 +306,7 @@ out.innerHTML="<div class='error'>Inserisci un composto</div>";
 return;
 }
 
+/* LOADING */
 out.innerHTML=`
 <div class="loading">
 <div class="molecule-loader">
@@ -491,7 +328,7 @@ out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
 
-/* proprietà */
+/* PROPRIETÀ */
 let r=await fetch(
 `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`
 );
@@ -505,7 +342,7 @@ out.innerHTML="<div class='error'>Errore dati</div>";
 return;
 }
 
-/* nome */
+/* NOME */
 const nameObj =
 getChemName(p, term);
 
@@ -561,31 +398,8 @@ Apri scheda
 
 </div>
 
-<button class='aiBtn'
-onclick='askAI()'>
-Chiedi ad AI ✨
-</button>
-
-<div id='aiOut' class='ai'></div>
-
 </div>
 `;
-
-}
-
-/* AI BUTTON */
-async function askAI(){
-
-let out=document.getElementById("aiOut");
-
-out.innerHTML=
-"<div class='loading'>AI in elaborazione...</div>";
-
-let res =
-await ai(lastName,lastFormula);
-
-out.innerHTML =
-`<b>ChemLab AI</b><p>${res}</p>`;
 
 }
 
