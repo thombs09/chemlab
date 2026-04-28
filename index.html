@@ -293,6 +293,173 @@ return;
 out.innerHTML=`
 <div class="loading">
 <div class="molecule-loader">
+<script>
+
+let lastName = "";
+let lastFormula = "";
+
+function sub(s){
+return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
+}
+
+/* INPUT BASE */
+const map={
+glucosio:"glucose",
+acqua:"water",
+ferro:"iron",
+oro:"gold",
+rame:"copper",
+argento:"silver",
+etanolo:"ethanol",
+metano:"methane",
+aspirina:"aspirin"
+};
+
+/* DIZIONARIO ITALIANO */
+const dictIT = {
+"water":"acqua",
+"glucose":"glucosio",
+"iron":"ferro",
+"iron(iii) oxide":"ossido di ferro(III)",
+"iron(3+) oxide":"ossido di ferro(III)",
+"diiron trioxide":"ossido di ferro(III)",
+"ammonium":"ione ammonio",
+"sulfuric acid":"acido solforico",
+"nitric acid":"acido nitrico",
+"hydrochloric acid":"acido cloridrico",
+"methane":"metano",
+"ethanol":"etanolo"
+};
+
+/* RICONOSCE FORMULA */
+function isFormula(q){
+return /^[A-Za-z0-9()+\-]+$/.test(q);
+}
+
+/* CID */
+async function cid(name){
+
+let type = isFormula(name) ? "formula" : "name";
+
+let r = await fetch(
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${type}/${encodeURIComponent(name)}/cids/JSON`
+);
+
+if(!r.ok) return null;
+
+let j = await r.json();
+
+return j?.IdentifierList?.CID?.[0] || null;
+}
+
+/* PRENDE SYNONYMS */
+async function getSynonyms(id){
+
+let r = await fetch(
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/synonyms/JSON`
+);
+
+if(!r.ok) return [];
+
+let j = await r.json();
+
+return j?.InformationList?.Information?.[0]?.Synonym || [];
+}
+
+/* CONTROLLA NOMI SCARSI */
+function bad(n){
+return !n || n.length > 60;
+}
+
+/* SCEGLIE NOME MIGLIORE */
+async function getChemName(p, term, id){
+
+let title = p.Title;
+let iupac = p.IUPACName;
+
+let synonyms = await getSynonyms(id);
+
+/* cerca nome leggibile nei synonyms */
+let synGood = synonyms.find(s =>
+s.length < 40 &&
+!/^\d+$/.test(s) &&
+!/^[A-Z0-9()+\-]+$/.test(s)
+);
+
+let base =
+!bad(synGood) ? synGood :
+!bad(title) ? title :
+!bad(iupac) ? iupac :
+term;
+
+let it = dictIT[base.toLowerCase()] || null;
+
+return {main: base, it};
+}
+
+/* AI */
+async function ai(name, formula){
+
+const r = await fetch(
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_KEY",
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body: JSON.stringify({
+contents:[{
+parts:[{
+text:`Sei un assistente di chimica.
+
+Rispondi SOLO in italiano e SOLO nel formato:
+
+🧪 Nome: ${name}
+🧬 Formula: ${formula}
+
+📌 Classificazione:
+- punto 1
+- punto 2
+- punto 3
+
+⚗️ Proprietà fondamentali:
+- punto 1
+- punto 2
+- punto 3
+- punto 4
+
+⚡ Funzione principale:
+- punto 1
+- punto 2
+
+🧠 Riassunto:
+- una frase semplice`
+}]
+}]
+})
+}
+);
+
+const data = await r.json();
+
+if(data?.error)
+return "AI error: " + data.error.message;
+
+return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
+}
+
+/* SEARCH */
+async function search(){
+
+let q=document.getElementById("q").value.trim();
+let out=document.getElementById("out");
+
+if(!q){
+out.innerHTML="<div class='error'>Inserisci un composto</div>";
+return;
+}
+
+out.innerHTML=`
+<div class="loading">
+<div class="molecule-loader">
 <div class="atom"></div>
 <div class="atom"></div>
 <div class="atom"></div>
@@ -302,6 +469,7 @@ Analisi molecolare...
 `;
 
 let term=map[q.toLowerCase()]||q;
+
 let id=await cid(term);
 
 if(!id){
@@ -309,11 +477,18 @@ out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
 
-let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`);
+/* proprietà base */
+let r=await fetch(
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`
+);
+
 let j=await r.json();
+
 let p=j?.PropertyTable?.Properties?.[0];
 
-const nameObj = getChemName(p, term);
+/* nome intelligente */
+const nameObj =
+await getChemName(p, term, id);
 
 lastName = nameObj.main;
 lastFormula = p.MolecularFormula;
@@ -324,41 +499,71 @@ let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
 out.innerHTML=`
 <div class='card'>
-<div class='big'>${sub(p.MolecularFormula)}</div>
 
-<div><b>${nameObj.main}</b></div>
+<div class='big'>
+${sub(p.MolecularFormula)}
+</div>
 
-${secondary ? `<div style="opacity:.75;font-size:.95rem">🇮🇹 ${secondary}</div>` : ""}
+<div>
+<b>${nameObj.main}</b>
+</div>
+
+${secondary ?
+`<div style="opacity:.75;font-size:.95rem">
+🇮🇹 ${secondary}
+</div>` : ""}
 
 <img src='${img}' width='260'>
 
 <div class='grid'>
-<div class='box'><div class='label'>Massa</div><div class='value'>${p.MolecularWeight}</div></div>
-<div class='box'><div class='label'>Carica</div><div class='value'>${p.Charge}</div></div>
+
+<div class='box'>
+<div class='label'>Massa</div>
+<div class='value'>${p.MolecularWeight}</div>
+</div>
+
+<div class='box'>
+<div class='label'>Carica</div>
+<div class='value'>${p.Charge}</div>
+</div>
+
 <div class='box'>
 <div class='label'>PubChem</div>
 <div class='value'>
-<a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}" target="_blank" style="color:#00D4FF;text-decoration:none;">
+<a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}"
+target="_blank"
+style="color:#00D4FF;text-decoration:none;">
 Apri scheda
 </a>
 </div>
 </div>
+
 </div>
 
-<button class='aiBtn' onclick='askAI()'>Chiedi ad AI ✨</button>
+<button class='aiBtn'
+onclick='askAI()'>
+Chiedi ad AI ✨
+</button>
 
 <div id='aiOut' class='ai'></div>
+
+</div>
 `;
 }
 
+/* AI BUTTON */
 async function askAI(){
 
 let out=document.getElementById("aiOut");
-out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
 
-let res = await ai(lastName,lastFormula);
+out.innerHTML=
+"<div class='loading'>AI in elaborazione...</div>";
 
-out.innerHTML = `<b>ChemLab AI</b><p>${res}</p>`;
+let res =
+await ai(lastName,lastFormula);
+
+out.innerHTML =
+`<b>ChemLab AI</b><p>${res}</p>`;
 }
 
 </script>
