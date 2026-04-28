@@ -10,9 +10,44 @@
 <style>
 body{
 margin:0;
+body{
+margin:0;
 font-family:'Nunito',sans-serif;
-background:#070B14;
 color:#cfefff;
+background: radial-gradient(circle at 20% 20%, #0b1b33, #070B14 60%);
+overflow-x:hidden;
+}
+
+/* floating glow orbs */
+body::before,
+body::after{
+content:"";
+position:fixed;
+width:400px;
+height:400px;
+border-radius:50%;
+filter:blur(120px);
+opacity:.25;
+z-index:-1;
+animation: float 10s ease-in-out infinite;
+}
+
+body::before{
+background:#00D4FF;
+top:-100px;
+left:-100px;
+}
+
+body::after{
+background:#B026FF;
+bottom:-120px;
+right:-120px;
+animation-delay: -5s;
+}
+
+@keyframes float{
+0%,100%{transform:translateY(0px) translateX(0px);}
+50%{transform:translateY(40px) translateX(20px);}
 }
 
 header{
@@ -48,25 +83,20 @@ outline:none;
 }
 
 button{
-padding:1rem 1.2rem;
-background:#00D4FF;
-border:none;
-font-weight:900;
-cursor:pointer;
+transition:.2s ease;
 }
 
-button:hover{background:#00a8cc;}
+button:active{
+transform:scale(.96);
+}
 
 .aiBtn{
-margin-top:1.5rem;
-padding:.9rem 1.6rem;
-background:#20e37a;
-border:none;
-border-radius:999px;
-font-weight:900;
-cursor:pointer;
-color:#06210f;
-box-shadow:0 0 18px rgba(32,227,122,.35);
+transition:.25s ease;
+}
+
+.aiBtn:hover{
+transform:scale(1.03);
+box-shadow:0 0 25px rgba(32,227,122,.5);
 }
 
 .container{
@@ -76,11 +106,25 @@ padding:1rem;
 }
 
 .card{
-background:#0B1220;
-border:1px solid #1f3b57;
+background:rgba(11,18,32,.6);
+backdrop-filter: blur(12px);
+border:1px solid rgba(0,212,255,.25);
 padding:1.5rem;
-border-radius:16px;
+border-radius:18px;
 margin-top:1rem;
+box-shadow:0 0 30px rgba(0,212,255,.08);
+animation: cardIn .6s ease-out;
+}
+
+@keyframes cardIn{
+from{
+opacity:0;
+transform:translateY(20px) scale(.98);
+}
+to{
+opacity:1;
+transform:translateY(0) scale(1);
+}
 }
 
 .big{
@@ -140,17 +184,21 @@ margin-top:1rem;
 width:60px;height:60px;margin:0 auto 10px auto;position:relative;
 }
 .atom{
-position:absolute;width:10px;height:10px;border-radius:50%;
-background:#00D4FF;top:50%;left:50%;
-transform-origin:0 0;
-animation:orbit 1.2s linear infinite;
+.atom{
+position:absolute;
+width:12px;
+height:12px;
+border-radius:50%;
+background:radial-gradient(circle,#00D4FF,#0088ff);
+top:50%;
+left:50%;
+animation:orbit 1.1s linear infinite;
+box-shadow:0 0 10px rgba(0,212,255,.6);
 }
-.atom:nth-child(2){animation-delay:.4s;}
-.atom:nth-child(3){animation-delay:.8s;}
 
 @keyframes orbit{
-0%{transform:rotate(0deg) translateX(20px) rotate(0deg);}
-100%{transform:rotate(360deg) translateX(20px) rotate(-360deg);}
+0%{transform:rotate(0deg) translateX(22px) rotate(0deg);}
+100%{transform:rotate(360deg) translateX(22px) rotate(-360deg);}
 }
 </style>
 </head>
