@@ -3,13 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChemLab</title>
+<title>ChemLab 2C</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
 
 <style>
-body{
-margin:0;
 body{
 margin:0;
 font-family:'Nunito',sans-serif;
@@ -18,7 +16,7 @@ background: radial-gradient(circle at 20% 20%, #0b1b33, #070B14 60%);
 overflow-x:hidden;
 }
 
-/* floating glow orbs */
+/* glow */
 body::before,
 body::after{
 content:"";
@@ -42,12 +40,12 @@ body::after{
 background:#B026FF;
 bottom:-120px;
 right:-120px;
-animation-delay: -5s;
+animation-delay:-5s;
 }
 
 @keyframes float{
-0%,100%{transform:translateY(0px) translateX(0px);}
-50%{transform:translateY(40px) translateX(20px);}
+0%,100%{transform:translate(0,0);}
+50%{transform:translate(40px,20px);}
 }
 
 header{
@@ -78,25 +76,29 @@ padding:1rem;
 background:#0B1220;
 border:none;
 color:white;
-font-size:1rem;
 outline:none;
 }
 
 button{
-transition:.2s ease;
+padding:1rem 1.2rem;
+background:#00D4FF;
+border:none;
+font-weight:900;
+cursor:pointer;
 }
 
-button:active{
-transform:scale(.96);
-}
+button:hover{background:#00a8cc;}
 
 .aiBtn{
-transition:.25s ease;
-}
-
-.aiBtn:hover{
-transform:scale(1.03);
-box-shadow:0 0 25px rgba(32,227,122,.5);
+margin-top:1.5rem;
+padding:.9rem 1.6rem;
+background:#20e37a;
+border:none;
+border-radius:999px;
+font-weight:900;
+cursor:pointer;
+color:#06210f;
+box-shadow:0 0 18px rgba(32,227,122,.35);
 }
 
 .container{
@@ -106,25 +108,12 @@ padding:1rem;
 }
 
 .card{
-background:rgba(11,18,32,.6);
+background:rgba(11,18,32,.65);
 backdrop-filter: blur(12px);
 border:1px solid rgba(0,212,255,.25);
 padding:1.5rem;
 border-radius:18px;
 margin-top:1rem;
-box-shadow:0 0 30px rgba(0,212,255,.08);
-animation: cardIn .6s ease-out;
-}
-
-@keyframes cardIn{
-from{
-opacity:0;
-transform:translateY(20px) scale(.98);
-}
-to{
-opacity:1;
-transform:translateY(0) scale(1);
-}
 }
 
 .big{
@@ -148,7 +137,7 @@ border-radius:12px;
 }
 
 .label{font-size:.7rem;color:#6aa6c9;}
-.value{font-weight:800;margin-top:.3rem;word-break:break-word;}
+.value{font-weight:800;}
 
 img{
 display:block;
@@ -158,19 +147,11 @@ padding:10px;
 border-radius:12px;
 }
 
-.ai{
-margin-top:2rem;
-padding:1.5rem;
-border-radius:14px;
-background:linear-gradient(135deg,rgba(0,212,255,.1),rgba(176,38,255,.08));
-border:1px solid #1f3b57;
-}
-
 .loading{
 text-align:center;
-margin-top:2rem;
 color:#00D4FF;
 font-weight:800;
+margin-top:2rem;
 }
 
 .error{
@@ -179,11 +160,14 @@ text-align:center;
 margin-top:1rem;
 }
 
-/* loader */
+/* LOADER FIXATO */
 .molecule-loader{
-width:60px;height:60px;margin:0 auto 10px auto;position:relative;
+width:60px;
+height:60px;
+margin:0 auto 10px auto;
+position:relative;
 }
-.atom{
+
 .atom{
 position:absolute;
 width:12px;
@@ -195,6 +179,10 @@ left:50%;
 animation:orbit 1.1s linear infinite;
 box-shadow:0 0 10px rgba(0,212,255,.6);
 }
+
+.atom:nth-child(1){animation-delay:0s;}
+.atom:nth-child(2){animation-delay:0.4s;}
+.atom:nth-child(3){animation-delay:0.8s;}
 
 @keyframes orbit{
 0%{transform:rotate(0deg) translateX(22px) rotate(0deg);}
@@ -226,7 +214,6 @@ function sub(s){
 return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
 }
 
-/* input base */
 const map={
 glucosio:"glucose",
 acqua:"water",
@@ -239,7 +226,6 @@ metano:"methane",
 aspirina:"aspirin"
 };
 
-/* CID */
 async function cid(name){
 let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
 if(!r.ok)return null;
@@ -247,7 +233,6 @@ let j=await r.json();
 return j?.IdentifierList?.CID?.[0]||null;
 }
 
-/* AI */
 async function ai(name, formula){
 
 const r = await fetch(
@@ -258,30 +243,10 @@ headers:{"Content-Type":"application/json"},
 body: JSON.stringify({
 contents:[{
 parts:[{
-text:`Sei un assistente di chimica.
+text:`Sei un assistente di chimica. Rispondi SOLO in italiano.
 
-Rispondi SOLO in italiano e SOLO nel formato:
-
-🧪 Nome: ${name}
-🧬 Formula: ${formula}
-
-📌 Classificazione:
-- punto 1
-- punto 2
-- punto 3
-
-⚗️ Proprietà fondamentali:
-- punto 1
-- punto 2
-- punto 3
-- punto 4
-
-⚡ Funzione principale:
-- punto 1
-- punto 2
-
-🧠 Riassunto:
-- una frase semplice`
+Nome: ${name}
+Formula: ${formula}`
 }]
 }]
 })
@@ -289,45 +254,9 @@ Rispondi SOLO in italiano e SOLO nel formato:
 );
 
 const data = await r.json();
-if(data?.error) return "AI error: " + data.error.message;
-
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
 }
 
-/* NOME INTELLIGENTE */
-function getChemName(p, term){
-
-const title = p.Title;
-const iupac = p.IUPACName;
-
-function bad(n){
-return !n || n.length > 60 || n.includes("(");
-}
-
-const dictIT = {
-"water":"acqua",
-"glucose":"glucosio",
-"iron":"ferro",
-"iron(iii) oxide":"ossido di ferro(III)",
-"ammonium":"ione ammonio",
-"sulfuric acid":"acido solforico",
-"nitric acid":"acido nitrico",
-"hydrochloric acid":"acido cloridrico",
-"methane":"metano",
-"ethanol":"etanolo"
-};
-
-let base =
-!bad(title) ? title :
-!bad(iupac) ? iupac :
-term;
-
-let it = dictIT[base.toLowerCase()] || null;
-
-return {main: base, it};
-}
-
-/* SEARCH */
 async function search(){
 
 let q=document.getElementById("q").value.trim();
@@ -345,7 +274,7 @@ out.innerHTML=`
 <div class="atom"></div>
 <div class="atom"></div>
 </div>
-Analisi molecolare...
+Analisi...
 </div>
 `;
 
@@ -357,56 +286,37 @@ out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
 
-let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Title,Charge/JSON`);
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,Charge/JSON`);
 let j=await r.json();
 let p=j?.PropertyTable?.Properties?.[0];
 
-const nameObj = getChemName(p, term);
-
-lastName = nameObj.main;
+lastName = p.IUPACName || term;
 lastFormula = p.MolecularFormula;
-
-let secondary = nameObj.it;
 
 let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
 out.innerHTML=`
 <div class='card'>
 <div class='big'>${sub(p.MolecularFormula)}</div>
-
-<div><b>${nameObj.main}</b></div>
-
-${secondary ? `<div style="opacity:.75;font-size:.95rem">🇮🇹 ${secondary}</div>` : ""}
+<div><b>${lastName}</b></div>
 
 <img src='${img}' width='260'>
 
 <div class='grid'>
 <div class='box'><div class='label'>Massa</div><div class='value'>${p.MolecularWeight}</div></div>
 <div class='box'><div class='label'>Carica</div><div class='value'>${p.Charge}</div></div>
-<div class='box'>
-<div class='label'>PubChem</div>
-<div class='value'>
-<a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}" target="_blank" style="color:#00D4FF;text-decoration:none;">
-Apri scheda
-</a>
-</div>
-</div>
 </div>
 
 <button class='aiBtn' onclick='askAI()'>Chiedi ad AI ✨</button>
-
-<div id='aiOut' class='ai'></div>
+<div id='aiOut' class='card'></div>
 `;
 }
 
 async function askAI(){
-
 let out=document.getElementById("aiOut");
-out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
-
-let res = await ai(lastName,lastFormula);
-
-out.innerHTML = `<b>ChemLab AI</b><p>${res}</p>`;
+out.innerHTML="AI in elaborazione...";
+let res=await ai(lastName,lastFormula);
+out.innerHTML=res;
 }
 
 </script>
